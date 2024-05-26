@@ -24,16 +24,11 @@ public class Lluvia {
     private Texture iconoVerde;
     private Sound dropSound;
     private Music rainMusic;
-    private boolean invencible;
-    private long tiempoInvencibilidad;
-    private boolean tarroLento = false;
-    private long tiempoInicioLentitud;
+    private EstadoJuego estadoJuego;
     private int totalGotasGeneradas;
     private float velocidadGota;
-    private boolean gotasTransformadas = false;
-    private long tiempoTransformacion;
     private static final long DURACION_TRANSFORMACION = 3000000000L; // 3 segundos
-    
+
     public int getTotalGotasGeneradas() {
         return totalGotasGeneradas;
     }
@@ -49,12 +44,7 @@ public class Lluvia {
         this.snowflake = snowflake;
         this.gotaVerde = gotaVerde;
         this.iconoVerde = iconoVerde;
-        invencible = false;
-        tiempoInvencibilidad = 0;
-        tarroLento = false;
-        tiempoInicioLentitud = 0;
-        gotasTransformadas = false;
-        tiempoTransformacion = 0;
+        this.estadoJuego = new EstadoJuego();
         totalGotasGeneradas = 0;
         velocidadGota = 300;
     }
@@ -64,104 +54,98 @@ public class Lluvia {
         rainDropsType = new Array<Integer>();
         totalGotasGeneradas = 0;
         crearGotaDeLluvia();
-        // start the playback of the background music immediately
         rainMusic.setLooping(true);
         rainMusic.play();
     }
-    
 
-    private void crearGotaDeLluvia() {
-        Rectangle raindrop;
-        boolean posicionValida;
-        
-        
-        do {
-            raindrop = new Rectangle();
-            raindrop.x = MathUtils.random(0, 800 - 32);
-            raindrop.y = 480;
-            raindrop.width = 32;
-            raindrop.height = 32;
-
-            posicionValida = true;
-            for (Rectangle existingRaindrop : rainDropsPos) {
-                if (existingRaindrop.y < 480 - 100 && existingRaindrop.y > raindrop.y - 32) {
-                    if (Math.abs(existingRaindrop.x - raindrop.x) < 250) {
-                        posicionValida = false;
-                        break;
-                    }
-                }
-            }
-        } while (!posicionValida);
-
-        rainDropsPos.add(raindrop);
-
-        int tipoGota;
+    private int determinarTipoGota() {
         int nivelActual = totalGotasGeneradas / 100 + 1;
-
-        // Ajustar la probabilidad de las gotas en función del nivel
         float probabilidadGotasBuenas = 50;
-        float probabilidadGotasMalas = 45;
+        float probabilidadGotasMalas = 46;
         for (int i = 0; i < nivelActual - 1; i++) {
             probabilidadGotasBuenas -= 2;
             probabilidadGotasMalas += 2;
         }
-
         float tipoGotaFloat = MathUtils.random(1, 100);
         if (tipoGotaFloat <= probabilidadGotasMalas)
-            tipoGota = 1; // gota mala
+            return 1;
         else if (tipoGotaFloat <= probabilidadGotasMalas + probabilidadGotasBuenas)
-            tipoGota = 2; // gota buena
+            return 2;
         else if (tipoGotaFloat <= probabilidadGotasMalas + probabilidadGotasBuenas + 1)
-            tipoGota = 3; // gota dorada
+            return 3;
         else if (tipoGotaFloat <= probabilidadGotasMalas + probabilidadGotasBuenas + 2)
-            tipoGota = 4; // bola de nieve
+            return 4;
         else
-            tipoGota = 5; // gota verde
+            return 5;
+    }
 
-        rainDropsType.add(tipoGota);
+    private void crearGotaDeLluvia() {
+        int tipoGota = determinarTipoGota();
+        ObjetoLluvia nuevaGota = null;
+        switch (tipoGota) {
+            case 1:
+                nuevaGota = new GotaMala(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                break;
+            case 2:
+                nuevaGota = new GotaBuena(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                break;
+            case 3:
+                nuevaGota = new GotaDorada(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                break;
+            case 4:
+                nuevaGota = new BolaDeHielo(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                break;
+            case 5:
+                nuevaGota = new GotaVerde(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                break;
+            default:
+                break;
+        }
+
+        if (nuevaGota != null) {
+            nuevaGota.crearGotaDeLluvia();
+        }
 
         lastDropTime = TimeUtils.nanoTime();
         totalGotasGeneradas++;
 
+        int nivelActual = totalGotasGeneradas / 100 + 1;
         if (totalGotasGeneradas % 250 == 0 && nivelActual < 15) {
             nivelActual++;
-            // Ajustar la velocidad de la gota en función del nivel
             if (nivelActual >= 2) {
-                // Aumentar la variabilidad en la velocidad de caída de las gotas
                 float variabilidad = nivelActual * 50;
                 velocidadGota = MathUtils.random(250 - variabilidad, 350 + variabilidad);
             }
         }
     }
-    
+
     public float getVelocidadGota() {
         return velocidadGota;
     }
 
     public boolean actualizarMovimiento(Tarro tarro) {
-    	float frecuenciaCreacion = 70 - totalGotasGeneradas / 100; // Frecuencia inicial - incremento por nivel
+        float frecuenciaCreacion = 70 - totalGotasGeneradas / 100;
         if (frecuenciaCreacion < 10) {
-            frecuenciaCreacion = 10; // Limitar la frecuencia mínima de creación de gotas
+            frecuenciaCreacion = 10;
         }
         if (TimeUtils.nanoTime() - lastDropTime > frecuenciaCreacion * 1000000) {
             crearGotaDeLluvia();
         }
-    	
-    	if (TimeUtils.nanoTime() - lastDropTime > 60000000) crearGotaDeLluvia();
 
-        if (invencible && TimeUtils.nanoTime() - tiempoInvencibilidad > 3000000000L) {	
-            invencible = false;
+        if (TimeUtils.nanoTime() - lastDropTime > 60000000) crearGotaDeLluvia();
+
+        if (estadoJuego.invencible && TimeUtils.nanoTime() - estadoJuego.tiempoInvencibilidad > 3000000000L) {
+            estadoJuego.invencible = false;
         }
 
-        if (tarroLento && TimeUtils.nanoTime() - tiempoInicioLentitud > 4000000000L) {
-            tarroLento = false;
+        if (estadoJuego.tarroLento && TimeUtils.nanoTime() - estadoJuego.tiempoInicioLentitud > 4000000000L) {
+            estadoJuego.tarroLento = false;
             tarro.setVelocidad(250);
         }
 
-        if (gotasTransformadas && TimeUtils.nanoTime() - tiempoTransformacion > DURACION_TRANSFORMACION) {
-            gotasTransformadas = false;
+        if (estadoJuego.gotasTransformadas && TimeUtils.nanoTime() - estadoJuego.tiempoTransformacion > DURACION_TRANSFORMACION) {
+            estadoJuego.gotasTransformadas = false;
         }
-        
 
         for (int i = 0; i < rainDropsPos.size; i++) {
             Rectangle raindrop = rainDropsPos.get(i);
@@ -170,62 +154,52 @@ public class Lluvia {
             if (raindrop.y + 64 < 0) {
                 rainDropsPos.removeIndex(i);
                 rainDropsType.removeIndex(i);
+                continue;
             }
 
+            ObjetoLluvia gota = null;
+            switch (rainDropsType.get(i)) {
+                case 1:
+                    gota = new GotaMala(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                    break;
+                case 2:
+                    gota = new GotaBuena(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                    break;
+                case 3:
+                    gota = new GotaDorada(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                    break;
+                case 4:
+                    gota = new BolaDeHielo(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                    break;
+                case 5:
+                    gota = new GotaVerde(rainDropsPos, rainDropsType, lastDropTime, totalGotasGeneradas, velocidadGota);
+                    break;
+            }
+            
             if (raindrop.overlaps(tarro.getArea())) {
-                if (rainDropsType.get(i) == 1) {
-                    if (!invencible) {
-                        tarro.dañar();
-                        if (tarro.getVidas() <= 0) return false;
+                if (gota != null) {
+                    boolean colision = gota.procesarColision(tarro, dropSound, estadoJuego);
+                    if (!colision) {
+                        return false;
                     }
-                    rainDropsPos.removeIndex(i);
-                    rainDropsType.removeIndex(i);
-                } else if (rainDropsType.get(i) == 2) {
-                    tarro.sumarPuntos(10);
-                    dropSound.play();
-                    rainDropsPos.removeIndex(i);
-                    rainDropsType.removeIndex(i);
-                } else if (rainDropsType.get(i) == 3) {
-                	tarro.aumentarVida();
-                	tarro.sumarPuntos(100);
-                    dropSound.play();
-                    invencible = true;
-                    tiempoInvencibilidad = TimeUtils.nanoTime();
-                    rainDropsPos.removeIndex(i);
-                    rainDropsType.removeIndex(i);
-                } else if (rainDropsType.get(i) == 4) {
-                    tarroLento = true;
-                    tiempoInicioLentitud = TimeUtils.nanoTime();
-                    tarro.setVelocidad(100);
-                    dropSound.play();
-                    rainDropsPos.removeIndex(i);
-                    rainDropsType.removeIndex(i);
-                } else if (rainDropsType.get(i) == 5) {
-                    gotasTransformadas = true;
-                    tiempoTransformacion = TimeUtils.nanoTime();
-                    // Cambiar gotas buenas transformadas a gotas malas
-                    for (int j = 0; j < rainDropsType.size; j++) {
-                        if (rainDropsType.get(j) == 2) { // Si es una gota buena
-                            rainDropsType.set(j, 1); // Cambiar a gota mala
-                        }
-                    }
-                    dropSound.play();
-                    rainDropsPos.removeIndex(i);
-                    rainDropsType.removeIndex(i);
                 }
+                rainDropsPos.removeIndex(i);
+                rainDropsType.removeIndex(i);
+                continue;
             }
         }
 
         return true;
     }
 
-    public void actualizarDibujoLluvia(SpriteBatch batch) {
+
+    public void dibujar(SpriteBatch batch) {
         for (int i = 0; i < rainDropsPos.size; i++) {
             Rectangle raindrop = rainDropsPos.get(i);
             if (rainDropsType.get(i) == 1) {
                 batch.draw(gotaMala, raindrop.x, raindrop.y, 23, 27);
             } else if (rainDropsType.get(i) == 2) {
-                if (gotasTransformadas) {
+                if (estadoJuego.gotasTransformadas) {
                     batch.draw(gotaMala, raindrop.x, raindrop.y, 23, 27);
                 } else {
                     batch.draw(gotaBuena, raindrop.x, raindrop.y, 22, 22);
@@ -239,13 +213,13 @@ public class Lluvia {
             }
         }
 
-        if (invencible) {
+        if (estadoJuego.invencible) {
             batch.draw(escudoTexture, 368, 380, 64, 64);
         }
-        if (tarroLento) {
+        if (estadoJuego.tarroLento) {
             batch.draw(snowflake, 368 - 80, 380, 110, 64);
         }
-        if (gotasTransformadas) {
+        if (estadoJuego.gotasTransformadas) {
             batch.draw(iconoVerde, 368 + 80, 380, 64, 64);
         }
     }
@@ -265,6 +239,10 @@ public class Lluvia {
         rainMusic.stop();
     }
 
+    public void continuar() {
+        rainMusic.play();
+    }
+}
     public void continuar() {
         rainMusic.play();
     }
