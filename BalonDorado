@@ -1,0 +1,27 @@
+package com.mygdx.game;
+
+import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.TimeUtils;
+
+class BalonDorado extends ObjetoBalon {
+    public BalonDorado(Array<Rectangle> rainDropsPos, Array<Integer> rainDropsType, long lastDropTime, int totalBalonesGenerados, float velocidadBalon) {
+        super(rainDropsPos, rainDropsType, lastDropTime, totalBalonesGenerados, velocidadBalon, velocidadBalon, velocidadBalon);
+    }
+    
+    @Override
+    protected int getTipoBalon() {
+        return 3;
+    }
+    
+    @Override
+    public boolean procesarColision(Arco arco, Sound dropSound, EstadoJuego estadoJuego) {
+        arco.aumentarVida();
+        arco.sumarPuntos(100);
+        dropSound.play();
+        estadoJuego.setInvencible(true);
+        estadoJuego.setTiempoInvencibilidad(TimeUtils.nanoTime());
+        return true;
+    }
+}
