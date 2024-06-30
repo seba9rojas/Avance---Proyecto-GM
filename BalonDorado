@@ -23,5 +23,6 @@ class BalonDorado extends ObjetoBalon {
         estadoJuego.setInvencible(true);
         estadoJuego.setTiempoInvencibilidad(TimeUtils.nanoTime());
         return true;
+
     }
 }
